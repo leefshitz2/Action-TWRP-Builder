@@ -14,7 +14,7 @@ on:
       DEVICE_TREE_URL:
         description: 'DEVICE_TREE_URL'
         required: true
-        default: 'https://github.com/twrpdtgen/android_device_alps_k37mv1_bsp/tree/full_k37mv1_bsp-user-10-QP1A.190711.020-p1k61v164bspP15-release-keys'
+        default: 'https://github.com/twrpdtgen/android_device_alps_k37mv1_bsp'
       DEVICE_TREE_BRANCH:
         description: 'DEVICE_TREE_BRANCH'
         required: true
