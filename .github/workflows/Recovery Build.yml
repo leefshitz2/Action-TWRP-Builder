@@ -14,7 +14,7 @@ on:
       DEVICE_TREE_URL:
         description: 'DEVICE_TREE_URL'
         required: true
-        default: 'https://github.com/twrpdtgen/android_device_alps_k37mv1_bsp'
+        default: 'https://github.com/leefshitz2/android_device_alps_k37mv1_bsp'
       DEVICE_TREE_BRANCH:
         description: 'DEVICE_TREE_BRANCH'
         required: true
