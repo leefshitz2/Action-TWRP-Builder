@@ -36,7 +36,7 @@ on:
       MAKEFILE_NAME:
         description: 'MAKEFILE_NAME'
         required: true
-        default: 'twrp_P7_A05'
+        default: 'pb_P7_A05'
       BUILD_TARGET:
         description: 'BUILD_TARGET'
         required: true
@@ -156,7 +156,7 @@ jobs:
       run: |
         source build/envsetup.sh
         export ALLOW_MISSING_DEPENDENCIES=true
-        lunch ${{ github.event.inputs.MAKEFILE_NAME }}-eng && make clean && make ${{ github.event.inputs.BUILD_TARGET }}image -j$(nproc --all)
+        lunch pb_P7_A05-eng && make clean && mka pbrp
       working-directory: ${{ steps.pwd.outputs.workspace-folder }}
 
     - name: Upload to Release
