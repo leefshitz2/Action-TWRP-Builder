@@ -156,7 +156,7 @@ jobs:
       run: |
         source build/envsetup.sh
         export ALLOW_MISSING_DEPENDENCIES=true
-        lunch twrp_Infinix-X6525-user && make clean && mka vendorbootimage
+        lunch twrp_X6525-eng && make clean && mka vendorbootimage -j$(nproc --all)
       working-directory: ${{ steps.pwd.outputs.workspace-folder }}
 
     - name: Upload to Release
