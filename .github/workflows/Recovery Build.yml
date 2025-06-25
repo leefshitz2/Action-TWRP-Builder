@@ -156,7 +156,7 @@ jobs:
       run: |
         source build/envsetup.sh
         export ALLOW_MISSING_DEPENDENCIES=true
-        lunch twrp_X96-eng && make clean && mka recoveryimage -j$(nproc --all)
+        lunch twrp_X96-eng && make clean && mka bootimage -j$(nproc --all)
       working-directory: ${{ steps.pwd.outputs.workspace-folder }}
 
     - name: Upload to Release
