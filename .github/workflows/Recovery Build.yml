@@ -10,11 +10,11 @@ on:
       MANIFEST_BRANCH:
         description: 'MANIFEST_BRANCH'
         required: true
-        default: 'android-7.1'
+        default: 'android-11.0'
       DEVICE_TREE_URL:
         description: 'DEVICE_TREE_URL'
         required: true
-        default: 'https://github.com/leefshitz2/android_device_samsung_zeroltevzw'
+        default: 'https://github.com/leefshitz2/PBRP-Sources-Doogee-X96'
       DEVICE_TREE_BRANCH:
         description: 'DEVICE_TREE_BRANCH'
         required: true
@@ -22,7 +22,7 @@ on:
       DEVICE_PATH:
         description: 'DEVICE_PATH'
         required: true
-        default: 'device/samsung/zeroltevzw'
+        default: 'device/doogee/X96'
       COMMON_TREE_URL:
         description: 'COMMON_TREE_URL (if no common tree, leave blank)'
         required: false
@@ -32,15 +32,15 @@ on:
       DEVICE_NAME:
         description: 'DEVICE_NAME'
         required: true
-        default: 'zeroltevzw'
+        default: 'X96'
       MAKEFILE_NAME:
         description: 'MAKEFILE_NAME'
         required: true
-        default: 'omni_zeroltevzw'
+        default: 'twrp_X96'
       BUILD_TARGET:
         description: 'BUILD_TARGET'
         required: true
-        default: 'recovery'
+        default: 'boot'
 
 jobs:
   build:
@@ -156,7 +156,7 @@ jobs:
       run: |
         source build/envsetup.sh
         export ALLOW_MISSING_DEPENDENCIES=true
-        lunch omni_zeroltevzw-eng && make clean && mka recoveryimage -j$(nproc --all)
+        lunch twrp_X96-eng && make clean && mka recoveryimage -j$(nproc --all)
       working-directory: ${{ steps.pwd.outputs.workspace-folder }}
 
     - name: Upload to Release
