@@ -10,19 +10,19 @@ on:
       MANIFEST_BRANCH:
         description: 'MANIFEST_BRANCH'
         required: true
-        default: 'twrp-11'
+        default: 'twrp-12.1'
       DEVICE_TREE_URL:
         description: 'DEVICE_TREE_URL'
         required: true
-        default: 'https://github.com/leefshitz2/OrangeFox-Sources-Doogee-X96'
+        default: 'https://github.com/Tecno-Pova-7-5G-LJ7-Development/device-tecno-lj7-twrp'
       DEVICE_TREE_BRANCH:
         description: 'DEVICE_TREE_BRANCH'
         required: true
-        default: 'main'
+        default: 'twrp-15'
       DEVICE_PATH:
         description: 'DEVICE_PATH'
         required: true
-        default: 'device/doogee/X96'
+        default: 'device/tecno/LJ7'
       COMMON_TREE_URL:
         description: 'COMMON_TREE_URL (if no common tree, leave blank)'
         required: false
@@ -32,15 +32,15 @@ on:
       DEVICE_NAME:
         description: 'DEVICE_NAME'
         required: true
-        default: 'X96'
+        default: 'LJ7'
       MAKEFILE_NAME:
         description: 'MAKEFILE_NAME'
         required: true
-        default: 'twrp_X96'
+        default: 'twrp_LJ7'
       BUILD_TARGET:
         description: 'BUILD_TARGET'
         required: true
-        default: 'boot'
+        default: 'vendorboot'
 
 jobs:
   build:
@@ -156,7 +156,7 @@ jobs:
       run: |
         source build/envsetup.sh
         export ALLOW_MISSING_DEPENDENCIES=true
-        lunch twrp_X96-eng && make clean && mka bootimage -j$(nproc --all)
+        lunch twrp_LJ7-eng && make clean && mka vendorboot -j$(nproc --all)
       working-directory: ${{ steps.pwd.outputs.workspace-folder }}
 
     - name: Upload to Release
