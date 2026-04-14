@@ -153,6 +153,14 @@ jobs:
       with:
         swap-size-gb: 12
 
+    - name: Patch TWRP build system for Virtual A/B
+      run: |
+        echo "=== Patching build system to allow BOARD_BUILD_SYSTEM_ROOT_IMAGE with dynamic partitions ==="
+        # Удаляем строку с ошибкой
+        sed -i '/BOARD_BUILD_SYSTEM_ROOT_IMAGE cannot be true for devices with dynamic partitions/d' build/make/core/config.mk
+        echo "=== Patch applied successfully ==="
+      working-directory: ${{ steps.pwd.outputs.workspace-folder }}
+
     - name: Building recovery
       run: |
         source build/envsetup.sh
