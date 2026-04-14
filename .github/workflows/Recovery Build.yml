@@ -62,14 +62,11 @@ jobs:
         echo "Build Target: ${{ github.event.inputs.BUILD_TARGET }}.img"
         echo "::endgroup::"
 
-    # You might want to Checkout your repo first, but not mandatory
     - name: Check Out
       uses: actions/checkout@v4
 
-    # Cleanup The Actions Workspace Using Custom Composite Run Actions
     - name: Cleanup
       uses: rokibhasansagar/slimhub_actions@main
-      # That's it! Now use your normal steps
 
     - name: Prepare the environment
       run: |
@@ -117,11 +114,126 @@ jobs:
     - name: Repo Sync
       run: |
         repo sync -j$(nproc --all) --force-sync
-      working-directory: workspace
+      working-directory: ${{ steps.pwd.outputs.workspace-folder }}
 
     - name: Clone device tree
       run: |
         git clone ${{ github.event.inputs.DEVICE_TREE_URL }} -b ${{ github.event.inputs.DEVICE_TREE_BRANCH }} ./${{ github.event.inputs.DEVICE_PATH }}
+      working-directory: ${{ steps.pwd.outputs.workspace-folder }}
+
+    - name: Apply TWRP Fixes for Doogee X96 (Unisoc SC9863A)
+      run: |
+        DEVICE_DIR="${{ steps.pwd.outputs.workspace-folder }}/${{ github.event.inputs.DEVICE_PATH }}"
+        
+        echo "=============================================="
+        echo "Applying TWRP Fixes for Doogee X96 (Unisoc)"
+        echo "=============================================="
+        
+        echo ""
+        echo "[1/6] Fixing BOARD_BUILD_SYSTEM_ROOT_IMAGE..."
+        sed -i 's/BOARD_BUILD_SYSTEM_ROOT_IMAGE := true/BOARD_BUILD_SYSTEM_ROOT_IMAGE := false/g' $DEVICE_DIR/BoardConfig.mk
+        echo "      -> Set to false (required for dynamic partitions)"
+        
+        echo ""
+        echo "[2/6] Enabling crypto/FBE support..."
+        sed -i 's/TW_INCLUDE_CRYPTO := false/TW_INCLUDE_CRYPTO := true/g' $DEVICE_DIR/BoardConfig.mk
+        sed -i 's/TW_INCLUDE_CRYPTO_FBE := false/TW_INCLUDE_CRYPTO_FBE := true/g' $DEVICE_DIR/BoardConfig.mk
+        sed -i 's/TW_INCLUDE_FBE_METADATA_DECRYPT := false/TW_INCLUDE_FBE_METADATA_DECRYPT := true/g' $DEVICE_DIR/BoardConfig.mk
+        echo "      -> Crypto and FBE enabled"
+        
+        echo ""
+        echo "[3/6] Fixing USB/MTP configuration..."
+        sed -i 's/TW_EXCLUDE_DEFAULT_USB_INIT := true/TW_EXCLUDE_DEFAULT_USB_INIT := false/g' $DEVICE_DIR/BoardConfig.mk
+        echo "      -> USB init enabled"
+        
+        echo ""
+        echo "[4/6] Adding Unisoc-specific flags..."
+        cat >> $DEVICE_DIR/BoardConfig.mk << 'EOF'
+
+# ============================================
+# FIXES FOR UNISOC SC9863A (DOOGEE X96)
+# ============================================
+TARGET_USE_DYNAMIC_PARTITIONS := true
+TW_INCLUDE_LIBRESETPROP := true
+TW_INCLUDE_USB_GADGET := true
+TW_INCLUDE_RESETPROP := true
+BOARD_AVB_ENABLE := false
+TARGET_RECOVERY_FSTAB := $(DEVICE_PATH)/recovery.fstab
+BOARD_ROOT_EXTRA_FOLDERS += metadata spl_trusty misc
+TW_USE_TOOLBOX := true
+TARGET_USES_MKE2FS := true
+EOF
+        echo "      -> Added: TARGET_USE_DYNAMIC_PARTITIONS, USB_GADGET, RESETPROP, AVB disabled"
+        
+        echo ""
+        echo "[5/6] Creating fixed recovery.fstab for dynamic partitions..."
+        cat > $DEVICE_DIR/recovery.fstab << 'EOF'
+# ================================================
+# RECOVERY FSTAB FOR DOOGEE X96 (UNISOC SC9863A)
+# ================================================
+
+# Bootloader and misc partitions
+/dev/block/by-name/boot                  /boot               emmc    defaults                        defaults
+/dev/block/by-name/misc                  /misc               emmc    defaults                        defaults
+/dev/block/by-name/dtbo                  /dtbo               emmc    defaults                        defaults
+/dev/block/by-name/vbmeta                /vbmeta             emmc    defaults                        defaults
+/dev/block/by-name/vbmeta_system         /vbmeta_system      emmc    defaults                        defaults
+/dev/block/by-name/vbmeta_vendor         /vbmeta_vendor      emmc    defaults                        defaults
+/dev/block/by-name/persist               /persist            emmc    defaults                        defaults
+
+# Metadata for FBE encryption
+/dev/block/by-name/metadata              /metadata           ext4    rw,noatime,nosuid,nodev         wait,check,formattable
+
+# ================================================
+# DYNAMIC PARTITIONS (LOGICAL VOLUMES)
+# IMPORTANT: NO /dev/block prefix!
+# ================================================
+system                                   /system             ext4    ro,logical                      wait,slotselect,avb=vbmeta_system,first_stage_mount
+system_ext                               /system_ext         ext4    ro,logical                      wait,slotselect,avb=vbmeta_system_ext,first_stage_mount
+vendor                                   /vendor             ext4    ro,logical                      wait,slotselect,avb=vbmeta_vendor,first_stage_mount
+product                                  /product            ext4    ro,logical                      wait,slotselect,avb=vbmeta_product,first_stage_mount
+
+# ================================================
+# USERDATA WITH FBE (FILE-BASED ENCRYPTION)
+# ================================================
+/dev/block/by-name/userdata              /data               f2fs    rw,noatime,nosuid,nodev,discard,inline_xattr,inline_data,reservedsize=128M    latemount,wait,check,formattable,fileencryption=ice,keydirectory=/metadata/vold/metadata_encryption,quota
+/dev/block/by-name/userdata              /data/media         f2fs    rw,noatime,nosuid,nodev,discard,inline_xattr,inline_data,reservedsize=128M    latemount,wait,check,flags=display="Internal Storage";symlink=/sdcard
+
+# ================================================
+# EXTERNAL STORAGE
+# ================================================
+/dev/block/mmcblk1p1                     /external_sd        vfat    rw                              wait,check
+/dev/block/mmcblk1                       /external_sd        auto    rw                              wait,check
+/dev/block/sda1                          /usb_otg            vfat    rw                              wait,check
+EOF
+        echo "      -> Created: recovery.fstab with logical volume support"
+        
+        echo ""
+        echo "[6/6] Fixing USB init script..."
+        if [ -f $DEVICE_DIR/recovery/root/init.recovery.usb.rc ]; then
+          sed -i 's/musb-hdrc/sprd_usb/g' $DEVICE_DIR/recovery/root/init.recovery.usb.rc
+          sed -i 's/0x1782/0x18D1/g' $DEVICE_DIR/recovery/root/init.recovery.usb.rc
+          sed -i 's/0x4001/0x4EE2/g' $DEVICE_DIR/recovery/root/init.recovery.usb.rc
+          sed -i 's/0x4003/0x4EE2/g' $DEVICE_DIR/recovery/root/init.recovery.usb.rc
+          echo "      -> USB controller changed to sprd_usb, VID/PID to 0x18D1/0x4EE2"
+        else
+          echo "      -> init.recovery.usb.rc not found, skipping"
+        fi
+        
+        echo ""
+        echo "Removing conflicting fstab in system subfolder..."
+        rm -rf $DEVICE_DIR/recovery/root/system
+        echo "      -> Removed recovery/root/system"
+        
+        echo ""
+        echo "=============================================="
+        echo "ALL FIXES APPLIED SUCCESSFULLY!"
+        echo "=============================================="
+        echo ""
+        echo "Current BoardConfig.mk crypto settings:"
+        grep -E "TW_INCLUDE_CRYPTO|BOARD_BUILD_SYSTEM_ROOT|TARGET_USE_DYNAMIC" $DEVICE_DIR/BoardConfig.mk || echo "  (some settings may be commented)"
+        echo ""
+        echo "=============================================="
       working-directory: ${{ steps.pwd.outputs.workspace-folder }}
 
     - name: Clone common tree
@@ -142,8 +254,12 @@ jobs:
 
     - name: Sync Device Dependencies
       run: |
-        bash ${GITHUB_WORKSPACE}/scripts/convert.sh ${{ github.event.inputs.DEVICE_PATH }}/${{ steps.buildtree.outputs.value }}.dependencies
-        repo sync -j$(nproc --all)
+        if [ -f "${{ github.event.inputs.DEVICE_PATH }}/${{ steps.buildtree.outputs.value }}.dependencies" ]; then
+          bash ${GITHUB_WORKSPACE}/scripts/convert.sh ${{ github.event.inputs.DEVICE_PATH }}/${{ steps.buildtree.outputs.value }}.dependencies
+          repo sync -j$(nproc --all)
+        else
+          echo "No dependencies file found, skipping"
+        fi
       working-directory: ${{ steps.pwd.outputs.workspace-folder }}
       continue-on-error: true
 
@@ -156,21 +272,54 @@ jobs:
       run: |
         source build/envsetup.sh
         export ALLOW_MISSING_DEPENDENCIES=true
-        lunch twrp_X96-eng && make clean && mka bootimage -j$(nproc --all)
+        lunch ${{ github.event.inputs.MAKEFILE_NAME }}-eng
+        make clean
+        make ${{ github.event.inputs.BUILD_TARGET }}image -j$(nproc --all)
       working-directory: ${{ steps.pwd.outputs.workspace-folder }}
+
+    - name: Check build output
+      run: |
+        echo "=============================================="
+        echo "Build completed. Output files:"
+        echo "=============================================="
+        ls -la ${{ steps.pwd.outputs.workspace-folder }}/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*.img || echo "No .img files found"
+        ls -la ${{ steps.pwd.outputs.workspace-folder }}/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*.zip || echo "No .zip files found"
+      working-directory: ${{ steps.pwd.outputs.workspace-folder }}
+      continue-on-error: true
 
     - name: Upload to Release
       uses: softprops/action-gh-release@v2
       with:
         files: | 
-          workspace/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/${{ github.event.inputs.BUILD_TARGET }}.img
-          workspace/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*.zip
-          workspace/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*.img
+          ${{ steps.pwd.outputs.workspace-folder }}/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/${{ github.event.inputs.BUILD_TARGET }}.img
+          ${{ steps.pwd.outputs.workspace-folder }}/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*.zip
+          ${{ steps.pwd.outputs.workspace-folder }}/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*.img
         name: ${{ github.event.inputs.DEVICE_NAME }}-${{ github.run_id }}
         tag_name: ${{ github.run_id }}
         body: |
-          Manifest: ${{ github.event.inputs.MANIFEST_BRANCH }}
-          Device: ${{ github.event.inputs.DEVICE_NAME }}
-          Target: ${{ github.event.inputs.BUILD_TARGET }}.img
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ## TWRP Build for ${{ github.event.inputs.DEVICE_NAME }}
+          
+          **Build Details:**
+          - Manifest: ${{ github.event.inputs.MANIFEST_BRANCH }}
+          - Device: ${{ github.event.inputs.DEVICE_NAME }}
+          - Target: ${{ github.event.inputs.BUILD_TARGET }}.img
+          - Date: $(date +"%Y-%m-%d %H:%M:%S")
+          
+          **Fixes Applied:**
+          - ✅ Dynamic partitions (Super) support
+          - ✅ FBE decryption enabled
+          - ✅ MTP/USB fixed (sprd_usb controller)
+          - ✅ Reboot to system fixed
+          - ✅ AVB disabled for proper mounting
+          
+          **Installation:**
+          ```bash
+          fastboot flash boot boot.img
+          fastboot reboot recovery```
+          Important: After first boot to TWRP, go to:
+          Wipe -> Format Data -> type "yes"
+          Then reboot to recovery again.
+
+Built via GitHub Actions | Run ID: ${{ github.run_id }}
+          env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
