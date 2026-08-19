@@ -14,11 +14,11 @@ on:
       DEVICE_TREE_URL:
         description: 'DEVICE_TREE_URL'
         required: true
-        default: 'https://github.com/leefshitz2/new_device_doogee_X96'
+        default: 'https://github.com/leefshitz2/twrp_device_doogee_X96'
       DEVICE_TREE_BRANCH:
         description: 'DEVICE_TREE_BRANCH'
         required: true
-        default: 'main'
+        default: 'master'
       DEVICE_PATH:
         description: 'DEVICE_PATH'
         required: true
